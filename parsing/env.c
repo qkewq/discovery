@@ -194,17 +194,36 @@ int get_num_vars(env_t *env){
 	return env->num_vars;
 }
 
-char *get_env(env_t *env, char *key){
+key_value_t *get_kv(env_t *env, char *key){
 	key_value_t *current = env->vars;
 	while(current){
 		if(strcmp(key, current->key) != 0){
 			current = current->next;
 			continue;
 		}
-		return current->value;
+		return current;
 	}
 
 	return NULL;
+}
+
+char *get_env(env_t *env, char *key){
+	key_value_t *kv = get_kv(env, key);
+	if(!kv){
+		return NULL;
+	}
+
+	return kv->value;
+}
+
+char *env_steal_value_mem(env_t *env, char *key){
+	key_value_t *kv = get_kv(env, key);
+	if(!kv){
+		return NULL;
+	}
+
+	kv->stolen = 1;
+	return kv->value;
 }
 
 void env_free(env_t *env){
@@ -212,7 +231,9 @@ void env_free(env_t *env){
 	key_value_t *next = NULL;
 	while(current){
 		free(current->key);
-		free(current->value);
+		if(!current->stolen){
+			free(current->value);
+		}
 		next = current->next;
 		free(current);
 		current = next;

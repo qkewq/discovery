@@ -7,6 +7,7 @@ typedef struct key_value_t{
 	char *value;
 	size_t line_num;
 	int error;
+	int stolen;
 } key_value_t;
 
 typedef struct env_t{
@@ -19,5 +20,6 @@ int get_num_vars(env_t *env);
 char *get_env(env_t *env, char *key);
 void env_free(env_t *env);
 const char *env_strerror(int error);
+char *env_steal_mem(env_t *env, char *key);
 
 #endif
