@@ -14,9 +14,10 @@ typedef struct env_t{
 	size_t num_vars;
 } env_t;
 
-env_t *env_init(char *path);
+int env_init(char *path, env_t **env);
 int get_num_vars(env_t *env);
 char *get_env(env_t *env, char *key);
 void env_free(env_t *env);
+const char *env_strerror(int error);
 
 #endif

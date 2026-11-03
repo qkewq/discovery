@@ -1,13 +1,19 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 
 #include "env.h"
 
-typedef enum ENV_ERRORS{
+typedef enum env_error_t{
+	EENV_SUCCESS = 0,
 	EENV_BADMEMORY = -1,
 	EENV_INVLDCHAR = -2,
-} ENV_ERRORS;
+	EENV_NOENVFILE = -3,
+	EENV_PERMSDENY = -4,
+	EENV_UNKNOWNER = -5,
+	EENV_FOVERFLOW = -6,
+} env_error_t;
 
 int scan_to(int current, char to, char *file, long file_len){
 	for(current; current < file_len; current++){
@@ -19,7 +25,7 @@ int scan_to(int current, char to, char *file, long file_len){
 	return current;
 }
 
-int get_key_value(int i, char *file, long file_len, key_value_t **new_var){
+env_error_t get_key_value(int i, char *file, long file_len, key_value_t **new_var){
 	int key_start = i;
 	int key_len = -1;
 	int val_start = -1;
@@ -78,11 +84,13 @@ int get_key_value(int i, char *file, long file_len, key_value_t **new_var){
 	return i;
 }
 
-env_t *parse_env(char *file, long file_len){
+env_error_t parse_env(char *file, long file_len, env_t **result){
 	env_t *env = calloc(1, sizeof(env_t));
 	if(!env){
-		return NULL;
+		return EENV_BADMEMORY;
 	}
+
+	key_value_t *current_kv = NULL;
 
 	size_t current_line = 1;
 	for(int i = 0; i < file_len; i++){
@@ -99,63 +107,87 @@ env_t *parse_env(char *file, long file_len){
 			continue;
 		}
 
-		//at key
 		key_value_t *new_var = NULL;
 		int res = get_key_value(i, file, file_len, &new_var);
 		if(res < 0){
 			env_free(env);
-			return NULL;
+			return res;
 		}
 		new_var->line_num = current_line;
-		new_var->next = env->vars;
-		env->vars = new_var;
+		if(!current_kv){
+			env->vars = new_var;
+			current_kv = new_var;
+		}
+		else{
+			current_kv->next = new_var;
+			current_kv = new_var;
+		}
 		env->num_vars++;
 		i = res - 1;
 	}
 
-	return env;
+	*result = env;
+	return EENV_SUCCESS;
 }
 
-env_t *env_init(char *path){
+env_error_t errno_to_env_error(int error){
+	switch(error){
+		case ENOMEM:
+			return EENV_BADMEMORY;
+		case ENOENT:
+			return EENV_NOENVFILE;
+		case EACCES:
+		case EPERM:
+			return EENV_PERMSDENY;
+		case EOVERFLOW:
+			return EENV_FOVERFLOW;
+		default:
+			return EENV_UNKNOWNER;
+	}
+}
+
+int env_init(char *path, env_t **result){
 	FILE *file = fopen(path, "r");
 	if(!file){
-		return NULL;
+		return errno_to_env_error(errno);
 	}
 
 	if(fseek(file, 0, SEEK_END) == -1){
 		fclose(file);
-		return NULL;
+		return errno_to_env_error(errno);
 	}
 
 	long file_len = ftell(file);
 	if(file_len == -1){
 		fclose(file);
-		return NULL;
+		return errno_to_env_error(errno);
 	}
 
 	char *env_file = calloc(file_len, sizeof(char));
 	if(!env_file){
 		fclose(file);
-		return NULL;
+		return EENV_BADMEMORY;
 	}
 
 	rewind(file);
 	if(fread(env_file, sizeof(char), file_len, file) != file_len){
 		free(env_file);
 		fclose(file);
-		return NULL;
+		return errno_to_env_error(errno);
 	}
 
 	fclose(file);
 
-	env_t *env = parse_env(env_file, file_len);
-	if(!env){
+	env_t *env = NULL;
+	env_error_t parse_error = parse_env(env_file, file_len, &env);
+	if(parse_error != EENV_SUCCESS){
 		free(env_file);
-		return NULL;
+		return parse_error;
 	}
 
 	free(env_file);
-	return env;
+	*result = env;
+	return EENV_SUCCESS;
 }
 
 int get_num_vars(env_t *env){
@@ -187,4 +219,23 @@ void env_free(env_t *env){
 	}
 
 	free(env);
+}
+
+const char *env_strerror(int error){
+	switch(error){
+		case EENV_SUCCESS:
+			return "Success";
+		case EENV_BADMEMORY:
+			return "Memory allocation failed";
+		case EENV_INVLDCHAR:
+			return "Could not parse env file";
+		case EENV_FOVERFLOW:
+			return "File size caused overflow";
+		case EENV_PERMSDENY:
+			return "Access to file was denied";
+		case EENV_NOENVFILE:
+			return "File could not be found";
+		default:
+			return "Unknown Error";
+	}
 }
