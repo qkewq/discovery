@@ -1,0 +1,22 @@
+#ifndef ENV_H
+#define ENV_H
+
+typedef struct key_value_t{
+	struct key_value_t *next;
+	char *key;
+	char *value;
+	size_t line_num;
+	int error;
+} key_value_t;
+
+typedef struct env_t{
+	struct key_value_t *vars;
+	size_t num_vars;
+} env_t;
+
+env_t *env_init(char *path);
+int get_num_vars(env_t *env);
+char *get_env(env_t *env, char *key);
+void env_free(env_t *env);
+
+#endif
