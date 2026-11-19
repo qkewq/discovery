@@ -2,7 +2,6 @@
 #include <string.h>
 
 #include "map.h"
-#include "types.h"
 
 map_t *map_init(size_t num_buckets){
 	map_t *map = calloc(1, sizeof(map_t));
