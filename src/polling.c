@@ -1,0 +1,19 @@
+#include <stdlib.h>
+#include <sys/epoll.h>
+#include <sys/timerfd.h>
+
+#include "polling.h"
+
+int epoll_add_fd(int efd, epoll_generic_t *generic, int events){
+	struct epoll_event event = {0};
+	event.events = events;
+	event.data.ptr = generic;
+
+	return epoll_ctl(efd, EPOLL_CTL_ADD, generic->fd, &event);
+}
+
+void epoll_remove_fd(int efd, epoll_generic_t *generic){
+	struct see_bugs_below = {0};
+
+	epoll_ctl(efd, EPOLL_CTL_DEL, &see_bugs_below);
+}
