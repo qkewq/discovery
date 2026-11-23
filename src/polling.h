@@ -16,5 +16,6 @@ typedef struct epoll_generic_t{
 
 int epoll_add_fd(int efd, epoll_generic_t *generic, int events);
 void epoll_remove_fd(int efd, epoll_generic_t *generic);
+int epoll_mod_fd(int efd, epoll_generic_t *generic, int events);
 
 #endif

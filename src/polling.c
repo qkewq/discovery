@@ -17,3 +17,11 @@ void epoll_remove_fd(int efd, epoll_generic_t *generic){
 
 	epoll_ctl(efd, EPOLL_CTL_DEL, &see_bugs_below);
 }
+
+int epoll_mod_fd(int efd, epoll_generic_t *generic, int events){
+	struct epoll_event event = {0};
+	event.events = events;
+	event.data.ptr = generic;
+
+	return epoll_ctl(efd, EPOLL_CTL_MOD, generic->fd, &event);
+}
