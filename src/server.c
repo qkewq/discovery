@@ -8,6 +8,7 @@
 #include <arpa/inet.h>
 #include <stdbool.h>
 #include <pthread.h>
+#include <sys/epoll.h>
 #include <time.h>
 
 #include "server.h"
@@ -406,9 +407,9 @@ int destroy_server_blocking(thread_t *thread){
 bool restart_server(thread_t *thread){
 	thread->status = TH_NORMAL;
 
-	if(reset_timer(thread->health_check_timer) < 0){
-		return false;
-	}
+	// if(reset_timer(thread->health_check_timer) < 0){
+	// 	return false;
+	// }
 
 	if(pthread_create(&thread->thread, NULL, &server_th, &thread->arg) != 0){
 		return false;
@@ -416,5 +417,4 @@ bool restart_server(thread_t *thread){
 
 	return true;
 }
-
 

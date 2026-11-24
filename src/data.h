@@ -4,6 +4,7 @@
 typedef char mac_addr_t[8];
 
 typedef struct resource_t{
+	struct resource_t *next;
 	int vmid;
 	char *pool;
 	char *node;
@@ -14,6 +15,7 @@ typedef struct vm_config_t{
 	mac_addr_t mac;
 	size_t config_size;
 	char *config_json;
+	int seen;
 } vm_config_t;
 
 typedef struct vm_configs_list_t{
@@ -28,5 +30,6 @@ int add_config(vm_configs_list_t *list, vm_config_t *config);
 vm_config_t *get_config_by_vmid(vm_configs_list_t *list, int vmid);
 vm_config_t *get_config_by_mac(vm_configs_list_t *list, mac_addr_t mac);
 void delete_config(vm_configs_list_t *list, int vmid);
+void free_vm_configs_list(vm_configs_list_t *list);
 
 #endif

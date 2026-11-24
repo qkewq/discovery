@@ -81,3 +81,9 @@ void delete_config(vm_configs_list_t *list, int vmid){
 	free(config->config_json);
 	free(config);
 }
+
+void free_vm_configs_list(vm_configs_list_t *list){
+	free_map(list->mac_map);
+	free_map(list->vmid_map);
+	pthread_mutex_destroy(list->lock);
+}
