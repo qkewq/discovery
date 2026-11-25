@@ -14,7 +14,7 @@ timerfd_t create_timer(int sec, int nsec){
 	struct itimerspec spec = {0};
 	spec.it_value.tv_sec = sec;
 	spec.it_value.tv_nsec = nsec;
-	spec.it_interval.tv_sec = nsec;
+	spec.it_interval.tv_sec = sec;
 	spec.it_interval.tv_nsec = nsec;
 
 	if(timerfd_settime(timer, 0, &spec, NULL) < 0){
