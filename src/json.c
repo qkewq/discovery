@@ -24,7 +24,7 @@ resource_t *exetract_router(char *resources, size_t size, size_t last_bracket){
 		}
 
 		if(!new->node){
-			if(memcmp(resources[current], "\"node\":\"", 8) == 0){
+			if(memcmp(&resources[current], "\"node\":\"", 8) == 0){
 				current += 8;
 				int length = strcspn(&resources[current], "\"");
 				new->node = calloc(length + 1, 1);
@@ -39,7 +39,7 @@ resource_t *exetract_router(char *resources, size_t size, size_t last_bracket){
 			}
 		}
 		else if(!new->pool){
-			if(memcmp(resources[current], "\"pool\":\"", 8) == 0){
+			if(memcmp(&resources[current], "\"pool\":\"", 8) == 0){
 				current += 8;
 				int length = strcspn(&resources[current], "\"");
 				new->pool = calloc(length + 1, 1);
@@ -54,7 +54,7 @@ resource_t *exetract_router(char *resources, size_t size, size_t last_bracket){
 			}
 		}
 		else if(!new->vmid){
-			if(memcmp(resources[current], "\"vmid\":", 7) == 0){
+			if(memcmp(&resources[current], "\"vmid\":", 7) == 0){
 				current += 7;
 				new->vmid = atoi(&resources[current]);
 				to_next_comma++;
@@ -84,7 +84,7 @@ resource_t *extract_current_routers(char *resources, size_t size){
 			last_bracket == i;
 			continue;
 		}
-		if(memcmp(resources[i], "\"name\":\"router\"", 15) != 0){
+		if(memcmp(&resources[i], "\"name\":\"router\"", 15) != 0){
 			for(i; i < size; i++){
 				if(resources[i] == ',' || resources[i] == '}'){
 					break;
@@ -92,7 +92,7 @@ resource_t *extract_current_routers(char *resources, size_t size){
 			}
 		}
 		else{
-			resource_t *new_node = exetract_router(char *resources, size_t size, size_t last_bracket);
+			resource_t *new_node = exetract_router(resources, size, last_bracket);
 			if(new_node){
 				new_node->next = head.next;
 				head.next = new_node;
@@ -149,7 +149,7 @@ int htoi(char c){
 }
 
 // scuffed ahh, must change later
-int extract_mac_addr(char *data, size_t data_size){
+mac_addr_t extract_mac_addr(char *data, size_t data_size){
 	int mac_start = -1;
 	for(int i = 0; i < data_size; i++){
 		if(memcmp(&data[i], "\"net0\":", 7) == 0){
@@ -163,18 +163,19 @@ int extract_mac_addr(char *data, size_t data_size){
 		}
 	}
 
+	mac_addr_t mac = {0};
+
 	if(mac_start < 0){
-		return 0;
+		return mac;
 	}
 
-	int mac = 0;
 	int j = 0;
 	for(int i = 0; i < 6; i++){
 		int num = htoi(data[mac_start + i]) << 4;
 		j++;
-		int num = htoi(data[mac_start + i + j]);
+		num = htoi(data[mac_start + i + j]);
 		j++;
-		mac += (num << 8 * (i - 1));
+		mac.mac[i] = num;
 	}
 
 	return mac;

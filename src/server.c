@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdint.h>
-#include <stdatomic.h>
+// #include <stdatomic.h>
 #include <sys/socket.h>
 #include <unistd.h>
 #include <arpa/inet.h>
@@ -10,6 +10,8 @@
 #include <pthread.h>
 #include <sys/epoll.h>
 #include <time.h>
+#include <fcntl.h>
+#include <arpa/inet.h>
 
 #include "server.h"
 #include "timers.h"
@@ -62,7 +64,7 @@ int create_listener(struct sockaddr_in *s_in){
 		return -1;
 	}
 
-	if(bind(sfd, (struct sockaddr *)&arg->s_in, sizeof(struct sockaddr_in)) != 0){
+	if(bind(sfd, (struct sockaddr *)s_in, sizeof(struct sockaddr_in)) != 0){
 		close(sfd);
 		return -1;
 	}
@@ -75,7 +77,7 @@ int create_listener(struct sockaddr_in *s_in){
 	return sfd;
 }
 
-void thread_cleanup(int listen_fd, int efd, client_t *client, timer_t *timer){
+void thread_cleanup(int listen_fd, int efd, client_t *client, timerfd_t timer){
 	close(listen_fd);
 	close(efd);
 	destroy_timer(timer);
@@ -136,7 +138,8 @@ client_t *accept_new_client(int efd, int listener){
 	client->generic.type = PT_CLIENT_CONN;
 	client->state = CTSTATE_WAITING_REQUEST;
 	client->last_activity = time(NULL);
-	client->generic.fd = accept(listener, &client->sin, sizeof(struct sockaddr_in));
+	socklen_t socklen = sizeof(struct sockaddr_in);
+	client->generic.fd = accept(listener, (struct sockaddr *)&client->sin, &socklen);
 	if(client->generic.fd < 0){
 		free(client);
 		return NULL;
@@ -185,7 +188,9 @@ int wait_request(int efd, client_t *client, vm_configs_list_t *list){
 		return 0;
 	}
 
-	mac_addr_t mac = (mac_addr_t)client->recv_buffer[1];
+	mac_addr_t mac = {0};
+	memcpy(&mac, &client->recv_buffer[1], sizeof(mac_addr_t));
+	// mac_addr_t mac = (mac_addr_t)client->recv_buffer[1];
 	vm_config_t *config = get_config_by_mac(list, mac);
 
 	if(!config){
@@ -195,7 +200,7 @@ int wait_request(int efd, client_t *client, vm_configs_list_t *list){
 		return 0;
 	}
 
-	if(config->config->size > SEND_BUFF_SIZE){
+	if(config->config_size > SEND_BUFF_SIZE){
 		client->send_buffer[0] = RES_SERVER_ERROR;
 		client->send_used++;
 		move_to_send(efd, client);
@@ -203,8 +208,8 @@ int wait_request(int efd, client_t *client, vm_configs_list_t *list){
 	}
 
 	client->send_buffer[0] = RES_SUCCESS;
-	client->send_buffer[1] = inet_htons(config->config_size);
-	memcpy(client->send_buffer[3], config->config_json, config->config_size);
+	client->send_buffer[1] = htons(config->config_size);
+	memcpy(&client->send_buffer[3], config->config_json, config->config_size);
 
 	client->send_used += config->config_size + 3;
 	move_to_send(efd, client);
@@ -235,6 +240,7 @@ int handle_client(int efd, client_t *client, int events, vm_configs_list_t *list
 		case CTSTATE_WAITING_CLEANUP:
 			return 0;
 	}
+	client->last_activity = time(NULL);
 
 	return 0;
 }
@@ -250,14 +256,14 @@ void *server_th(void *server_arg){
 
 	listener.fd = create_listener(&arg->s_in);
 	if(listener.fd < 0){
-		arg->status = TH_SOCK_CREATE_ERROR;
+		*arg->status = TH_SOCK_CREATE_ERROR;
 		return NULL;
 	}
 
 	int efd = epoll_create1(0);
 	if(efd < 0){
 		close(listener.fd);
-		arg->status = TH_EPOLL_CREATE_ERROR;
+		*arg->status = TH_EPOLL_CREATE_ERROR;
 		return NULL;
 	}
 
@@ -265,7 +271,7 @@ void *server_th(void *server_arg){
 	if(idle_timer.fd < 0){
 		close(efd);
 		close(listener.fd);
-		arg->status = TH_EXITTED;
+		*arg->status = TH_EXITTED;
 		return NULL;
 	}
 
@@ -273,7 +279,7 @@ void *server_th(void *server_arg){
 		close(efd);
 		close(listener.fd);
 		destroy_timer(idle_timer.fd);
-		arg->status = TH_EPOLL_ADD_ERROR;
+		*arg->status = TH_EPOLL_ADD_ERROR;
 		return NULL;
 	}
 
@@ -281,7 +287,7 @@ void *server_th(void *server_arg){
 		close(efd);
 		close(listener.fd);
 		destroy_timer(idle_timer.fd);
-		arg->status = TH_EPOLL_ADD_ERROR;
+		*arg->status = TH_EPOLL_ADD_ERROR;
 		return NULL;
 	}
 
@@ -291,22 +297,22 @@ void *server_th(void *server_arg){
 	while(1){
 		int ready_fds = epoll_wait(efd, events, MAX_EPOLL_EVENTS, 1000);
 		if(ready_fds == -1){
-			thread_cleanup(listener.fd, efd, clients, idle_timer); // listener, epoll, timer, clients
-			arg->status = TH_EPOLL_WAIT_ERROR;
+			thread_cleanup(listener.fd, efd, clients, idle_timer.fd); // listener, epoll, timer, clients
+			*arg->status = TH_EPOLL_WAIT_ERROR;
 			return NULL;
 		}
 
-		if(arg->status == TH_PARENT_JOIN){
-			thread_cleanup(listener.fd, efd, clients, idle_timer);
+		if(*arg->status == TH_PARENT_JOIN){
+			thread_cleanup(listener.fd, efd, clients, idle_timer.fd);
 			return NULL;
 		}
 
 		for(int i = 0; i < ready_fds; i++){
-			epoll_generic_t *generic = (epoll_generic_t *)events[i].ptr;
+			epoll_generic_t *generic = (epoll_generic_t *)events[i].data.ptr;
 			switch(generic->type){
 				case PT_LISTENER:
 					if(events[i].events & (EPOLLERR | EPOLLHUP)){
-						thread_cleanup(listener.fd, efd, clients, idle_timer);
+						thread_cleanup(listener.fd, efd, clients, idle_timer.fd);
 						return NULL;
 					}
 					client_t *new_client = accept_new_client(efd, generic->fd);
@@ -349,12 +355,13 @@ thread_t *create_server(char *listen_addr, uint16_t listen_port, vm_configs_list
 	thread->arg.list = list;
 	thread->arg.status = &thread->status;
 
-	if(inet_pton(AF_INET, listen_addr, thread->arg.s_in) != 1){
+	if(inet_pton(AF_INET, listen_addr, (void *)&thread->arg.s_in.sin_addr) != 1){
 		free(thread);
 		return NULL;
 	}
 
-	thread->arg.s_in = htons(listen_port);
+	thread->arg.s_in.sin_port = htons(listen_port);
+	thread->arg.s_in.sin_family = AF_INET;
 
 	thread->health_check_timer = create_timer(HEALTH_CHECK_SEC, HEALTH_CHECK_NSEC);
 	if(thread->health_check_timer < 0){
@@ -363,7 +370,7 @@ thread_t *create_server(char *listen_addr, uint16_t listen_port, vm_configs_list
 	}
 
 	if(pthread_create(&thread->thread, NULL, &server_th, &thread->arg) != 0){
-		destroy_timer(thread->health_check_timer)
+		destroy_timer(thread->health_check_timer);
 		free(thread);
 		return NULL;
 	}
@@ -395,7 +402,7 @@ int destroy_server_blocking(thread_t *thread){
 
 	destroy_timer(thread->health_check_timer);
 
-	if(pthread_join(thread->thread) != 0){
+	if(pthread_join(thread->thread, NULL) != 0){
 		thread_free(thread);
 		return -1;
 	}

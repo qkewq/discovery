@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <stdint.h>
 #include <pthread.h>
 
 
@@ -35,7 +36,7 @@ int add_config(vm_configs_list_t *list, vm_config_t *config){
 		pthread_mutex_unlock(&list->lock);
 		return -1;
 	}
-	if(map_insert(list->mac_map, (int)config->mac, config, sizeof(vm_config_t *)) < 0){
+	if(map_insert(list->mac_map, (uint64_t)config->mac.mac[0], config, sizeof(vm_config_t *)) < 0){
 		map_delete(list->vmid_map, config->vmid);
 		pthread_mutex_unlock(&list->lock);
 		return -1;
@@ -58,7 +59,7 @@ vm_config_t *get_config_by_vmid(vm_configs_list_t *list, int vmid){
 vm_config_t *get_config_by_mac(vm_configs_list_t *list, mac_addr_t mac){
 	size_t value_size = 0;
 	pthread_mutex_lock(&list->lock);
-	vm_config_t *config = (vm_config_t *)map_lookup(list->mac_map, (int)mac, &value_size);
+	vm_config_t *config = (vm_config_t *)map_lookup(list->mac_map, (uint64_t)mac.mac[0], &value_size);
 	pthread_mutex_unlock(&list->lock);
 
 	return config;
@@ -74,7 +75,7 @@ void delete_config(vm_configs_list_t *list, int vmid){
 
 	pthread_mutex_lock(&list->lock);
 	map_delete(list->vmid_map, config->vmid);
-	map_delete(list->mac_map, (int)config->mac);
+	map_delete(list->mac_map, (uint64_t)config->mac.mac[0]);
 	list->num_configs--;
 	pthread_mutex_unlock(&list->lock);
 
@@ -85,5 +86,5 @@ void delete_config(vm_configs_list_t *list, int vmid){
 void free_vm_configs_list(vm_configs_list_t *list){
 	free_map(list->mac_map);
 	free_map(list->vmid_map);
-	pthread_mutex_destroy(list->lock);
+	pthread_mutex_destroy(&list->lock);
 }

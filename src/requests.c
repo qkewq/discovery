@@ -1,6 +1,7 @@
+#include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
-#include <curl/curl.h>
+// #include <curl/curl.h>
 
 #include "requests.h"
 
@@ -30,7 +31,7 @@ connection_t *pve_conn_init(conn_configs_t *configs){
 		return NULL;
 	}
 
-	if(curl_easy_global_init(CURL_GLOBAL_DEFAULT) != CURLE_OKAY){
+	if(curl_global_init(CURL_GLOBAL_DEFAULT) != CURLE_OK){
 		connection_cleanup(conn);
 		return NULL;
 	}
@@ -66,22 +67,22 @@ connection_t *pve_conn_init(conn_configs_t *configs){
 	conn->slist = temp_slist;
 	free(auth_header);
 
-	if(curl_easy_setopt(conn->conn, CURLOPT_HTTPHEADER, conn->slist) != CURLE_OKAY){
+	if(curl_easy_setopt(conn->conn, CURLOPT_HTTPHEADER, conn->slist) != CURLE_OK){
 		connection_cleanup(conn);
 		return NULL;
 	}
 
-	// if(curl_easy_setopt(conn->conn, CURLOPT_URL, configs->pve_url) != CURLE_OKAY){
+	// if(curl_easy_setopt(conn->conn, CURLOPT_URL, configs->pve_url) != CURLE_OK){
 	// 	connection_cleanup(conn);
 	// 	return NULL;
 	// }
 
-	if(curl_easy_setopt(conn->conn, CURLOPT_FOLLOWLOCATION, 1L) != CURLE_OKAY){
+	if(curl_easy_setopt(conn->conn, CURLOPT_FOLLOWLOCATION, 1L) != CURLE_OK){
 		connection_cleanup(conn);
 		return NULL;
 	}
 
-	if(curl_easy_setopt(conn->conn, CURLOPT_WRITEFUNCTION, response_callback) != CURLE_OKAY){
+	if(curl_easy_setopt(conn->conn, CURLOPT_WRITEFUNCTION, response_callback) != CURLE_OK){
 		connection_cleanup(conn);
 		return NULL;
 	}
@@ -101,7 +102,7 @@ response_t *make_request(request_t *req, char *base_url){
 		return NULL;
 	}
 
-	if(curl_easy_setopt(req->conn.conn, CURLOPT_WRITEDATA, (void *)res) != CURLE_OKAY){
+	if(curl_easy_setopt(req->conn.conn, CURLOPT_WRITEDATA, (void *)res) != CURLE_OK){
 		free(res);
 		return NULL;
 	}
@@ -111,17 +112,17 @@ response_t *make_request(request_t *req, char *base_url){
 		free(res);
 		return NULL;
 	}
-	if(curl_easy_setopt(req->conn.conn, CURLOPT_URL, full_url) != CURLE_OKAY){
+	if(curl_easy_setopt(req->conn.conn, CURLOPT_URL, full_url) != CURLE_OK){
 		free(res);
 		return NULL;
 	}
 
-	if(curl_easy_perform(req->conn.conn) != CURL_EOKAY){
+	if(curl_easy_perform(req->conn.conn) != CURLE_OK){
 		free(res);
 		return NULL;
 	}
 
-	if(curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &res->code) != CURLE_OKAY){
+	if(curl_easy_getinfo(req->conn.conn, CURLINFO_RESPONSE_CODE, &res->code) != CURLE_OK){
 		free(res->data);
 		free(res);
 		return NULL;
@@ -131,9 +132,9 @@ response_t *make_request(request_t *req, char *base_url){
 }
 
 void connection_cleanup(connection_t *conn){
-	curl_slist_free_all(conn.slist);
-	curl_easy_cleanup(conn.conn);
-	curl_easy_global_cleanup();
+	curl_slist_free_all(conn->slist);
+	curl_easy_cleanup(conn->conn);
+	curl_global_cleanup();
 	free(conn);
 }
 

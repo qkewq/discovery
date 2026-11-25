@@ -4,10 +4,11 @@
 #include <string.h>
 #include <sys/epoll.h>
 #include <stdbool.h>
+#include <unistd.h>
 
-#include "parsing/env.h"
-#include "requests/requests.h"
-#include "data/map.h"
+#include "env.h"
+#include "requests.h"
+#include "map.h"
 #include "timers.h"
 #include "data.h"
 #include "server.h"
@@ -62,9 +63,9 @@ void free_and_reset_seen(vm_configs_list_t *list){
 	}
 }
 
-int update_list(vm_configs_list_t *list){
+int update_list(vm_configs_list_t *list, connection_t *conn, env_configs_t *configs){
 	request_t req = {
-		.conn = conn,
+		.conn = *conn,
 		.method = GET_METHOD,
 		.path = "/cluster/resources?type=vm",
 	};
@@ -104,21 +105,19 @@ int update_list(vm_configs_list_t *list){
 		current = next;
 	}
 
-	free_and_reset_seen(vm_configs_list_t *list);
+	free_and_reset_seen(list);
 
 	prev = &dummy;
 	current = prev->next;
 	next = NULL;
 
 	while(current){
-		char path[255] = {0};
-		req.conn = conn;
+		req.conn = *conn;
 		req.method = GET_METHOD;
-		if(snprintf(path, sizeof(path), "/nodes/%s/qemu/%d/config", current->node, current->vmid) > sizeof(path)){
+		if(snprintf(req.path, sizeof(req.path), "/nodes/%s/qemu/%d/config", current->node, current->vmid) > sizeof(req.path)){
 			current = current->next;
 			continue;
 		}
-		req.path = path;
 
 		res = make_request(&req, configs->conn_configs.pve_url);
 		if(!res){
@@ -139,9 +138,10 @@ int update_list(vm_configs_list_t *list){
 			continue;
 		}
 
+		mac_addr_t zero_mac = {0};
 		new_config->vmid = current->vmid;
-		new_config->mac = (mac_addr_t)extract_mac_addr(res->data, res->data_size);
-		if(!new_config->mac){
+		new_config->mac = extract_mac_addr(res->data, res->data_size);
+		if(memcmp(&new_config->mac, &zero_mac, sizeof(mac_addr_t)) == 0){
 			free_response(res);
 			free(new_config);
 			current = current->next;
@@ -177,7 +177,7 @@ int update_list(vm_configs_list_t *list){
 		current = current->next;
 	}
 
-	current = dummy->next;
+	current = dummy.next;
 	next = NULL;
 	while(current){
 		next = current->next;
@@ -191,7 +191,7 @@ int update_list(vm_configs_list_t *list){
 }
 
 int discovery(env_configs_t *configs, vm_configs_list_t *list){
-	timer_t *poll_timer = create_timer(configs->poll_timer_sec, 0);
+	timerfd_t poll_timer = create_timer(configs->poll_timer_sec, 0);
 	if(!poll_timer){
 		return -1;
 	}
@@ -242,7 +242,7 @@ int discovery(env_configs_t *configs, vm_configs_list_t *list){
 
 	struct epoll_event events[2] = {0};
 	while(1){
-		int ready_timers = epoll_wait(efd, &events, sizeof(events) / sizeof(struct epoll_event));
+		int ready_timers = epoll_wait(efd, &events[0], sizeof(events) / sizeof(struct epoll_event), -1);
 		if(ready_timers == -1){
 			connection_cleanup(conn);
 			close(efd);
@@ -259,10 +259,11 @@ int discovery(env_configs_t *configs, vm_configs_list_t *list){
 				destroy_server_blocking(thread);
 				return -1;
 			}
-			epoll_generic_t *generic = (epoll_generic_t *)events[i]->ptr;
+			epoll_generic_t *generic = (epoll_generic_t *)events[i].data.ptr;
 			switch(generic->type){
 				case PT_POLL_UPSTREAM:
-					update_list(list);
+					update_list(list, conn, configs);
+					reset_timer(generic->fd);
 					break;
 				case PT_THREAD_TIMER:
 					if(!health_check(thread)){
@@ -279,44 +280,6 @@ int discovery(env_configs_t *configs, vm_configs_list_t *list){
 	}
 
 	return 0;
-}
-
-int discovery(env_configs_t *configs, vm_configs_list_t *list){
-	connection_t *conn = pve_conn_init(&configs->conn_configs);
-	if(!conn){
-		return -1;
-	}
-
-	while(1){
-		sleep(configs->poll_timer_sec);
-		request_t req = {
-			.conn = conn,
-			.method = GET_METHOD,
-			.path = "/cluster/resources?type=vm",
-		};
-		response_t *res = make_request(&req, configs->conn_configs.pve_url);
-		if(!res){
-			connection_cleanup(conn);
-			return -1;
-		}
-
-		if(res->code != 200){
-			free_response(res);
-			continue;
-		}
-
-		resource_t *resources = NULL;
-		int num_resources = get_resources_filter_name(&resources, res, "router");
-		if(num_resources < 0){
-			free_response(res);
-			continue;
-		}
-		free_response(res);
-
-		for(int i = 0; i < num_resources; i++){
-
-		}
-	}
 }
 
 void free_configs(env_configs_t *configs){
@@ -378,7 +341,7 @@ int populate_map(vm_configs_list_t *list){
 int main(int argc, char **argv){
 	char *env_path = DEFAULT_ENV;
 	if(argc > 1){
-		env_path = &argv[1];
+		env_path = &argv[1][0];
 	}
 
 	env_configs_t *configs = calloc(1, sizeof(env_configs_t));
@@ -433,7 +396,7 @@ int main(int argc, char **argv){
 		missing_key("PROXMOX_API_KEY");
 		missing_configs++;
 	}
-	configs->conn_configs.api_key = env_steal_value_mem(env, "PROXMOX_TOKEN_ID");
+	configs->conn_configs.token_id = env_steal_value_mem(env, "PROXMOX_TOKEN_ID");
 	if(!configs->conn_configs.token_id){
 		missing_key("PROXMOX_TOKEN_ID");
 		missing_configs++;

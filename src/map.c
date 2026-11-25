@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
 
 #include "map.h"
 
@@ -20,7 +21,7 @@ map_t *map_init(size_t num_buckets){
 	return map;
 }
 
-int map_insert(map_t *map, int key, void *value, size_t value_size){
+int map_insert(map_t *map, uint64_t key, void *value, size_t value_size){
 	map_node_t *node = calloc(1, sizeof(map_node_t));
 	if(!node){
 		return -1;
@@ -47,7 +48,7 @@ int map_insert(map_t *map, int key, void *value, size_t value_size){
 	return 0;
 }
 
-void *map_lookup(map_t *map, int key, size_t *value_size){
+void *map_lookup(map_t *map, uint64_t key, size_t *value_size){
 	size_t index = key % map->num_buckets;
 
 	map_node_t *current = map->map[index];
@@ -63,7 +64,7 @@ void *map_lookup(map_t *map, int key, size_t *value_size){
 	return NULL;
 }
 
-void map_delete(map_t *map, int key){
+void map_delete(map_t *map, uint64_t key){
 	size_t index = key % map->num_buckets;
 
 	map_node_t *prev = NULL;

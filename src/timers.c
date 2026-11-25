@@ -5,8 +5,8 @@
 
 #include "timers.h"
 
-timer_t create_timer(int sec, int nsec){
-	timer_t timer = timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK);
+timerfd_t create_timer(int sec, int nsec){
+	timerfd_t timer = timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK);
 	if(timer < 0){
 		return -1;
 	}
@@ -25,15 +25,15 @@ timer_t create_timer(int sec, int nsec){
 	return timer;
 }
 
-int reset_timer(timer_t timer){
+int reset_timer(timerfd_t timer){
 	uint64_t count = 0;
-	if(read(time, &count, sizeof(uint64_t)) != sizeof(uint64_t)){
+	if(read(timer, &count, sizeof(uint64_t)) != sizeof(uint64_t)){
 		return -1;
 	}
 
 	return count;
 }
 
-void destroy_timer(timer_t timer){
+void destroy_timer(timerfd_t timer){
 	close(timer);
 }

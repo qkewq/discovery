@@ -1,7 +1,13 @@
 #ifndef DATA_H
 #define DATA_H
 
-typedef char mac_addr_t[8];
+// typedef unsigned char mac_addr_t[8];
+
+typedef struct mac_addr_t{
+	unsigned char mac[8];
+} mac_addr_t;
+
+typedef struct map_t map_t;
 
 typedef struct resource_t{
 	struct resource_t *next;

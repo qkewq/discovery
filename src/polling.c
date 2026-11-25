@@ -13,9 +13,9 @@ int epoll_add_fd(int efd, epoll_generic_t *generic, int events){
 }
 
 void epoll_remove_fd(int efd, epoll_generic_t *generic){
-	struct see_bugs_below = {0};
+	struct epoll_event see_bugs_below = {0};
 
-	epoll_ctl(efd, EPOLL_CTL_DEL, &see_bugs_below);
+	epoll_ctl(efd, EPOLL_CTL_DEL, generic->fd, &see_bugs_below);
 }
 
 int epoll_mod_fd(int efd, epoll_generic_t *generic, int events){
