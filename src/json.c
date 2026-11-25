@@ -4,15 +4,15 @@
 #include "json.h"
 #include "data.h"
 
-resource_t *exetract_router(char *resources, size_t size, size_t last_bracket){
+resource_t *extract_router(char *resources, size_t size, size_t open_brace, size_t close_brace){
 	resource_t *new = calloc(1, sizeof(resource_t));
 	if(!new){
 		return NULL;
 	}
 
-	size_t current = last_bracket;
+	size_t current = open_brace;
 	int to_next_comma = 0;
-	while(current != '}'){
+	while(current < close_brace){
 		if(to_next_comma && resources[current] != ','){
 			current++;
 			continue;
@@ -38,7 +38,7 @@ resource_t *exetract_router(char *resources, size_t size, size_t last_bracket){
 				continue;
 			}
 		}
-		else if(!new->pool){
+		if(!new->pool){
 			if(memcmp(&resources[current], "\"pool\":\"", 8) == 0){
 				current += 8;
 				int length = strcspn(&resources[current], "\"");
@@ -53,7 +53,7 @@ resource_t *exetract_router(char *resources, size_t size, size_t last_bracket){
 				continue;
 			}
 		}
-		else if(!new->vmid){
+		if(!new->vmid){
 			if(memcmp(&resources[current], "\"vmid\":", 7) == 0){
 				current += 7;
 				new->vmid = atoi(&resources[current]);
@@ -75,13 +75,28 @@ resource_t *exetract_router(char *resources, size_t size, size_t last_bracket){
 	return new;
 }
 
+// keep pos of last open brace
+// check if name = router
+// run to last brace
+// give start and stop to extract router
+// extract router looks for node, pool, vmid
+
 resource_t *extract_current_routers(char *resources, size_t size){
-	size_t last_bracket = 0;
+	size_t open_brace_pos = 0;
+	size_t close_brace_pos = 0;
 	resource_t head = {0};
 
-	for(int i = 0; i < size; i++){
+	int i = 0;
+	for(i; i < size; i++){
+		if(resources[i] == '['){
+			i++;
+			break;
+		}
+	}
+
+	for(i; i < size; i++){
 		if(resources[i] == '{'){
-			last_bracket == i;
+			open_brace_pos = i;
 			continue;
 		}
 		if(memcmp(&resources[i], "\"name\":\"router\"", 15) != 0){
@@ -92,7 +107,13 @@ resource_t *extract_current_routers(char *resources, size_t size){
 			}
 		}
 		else{
-			resource_t *new_node = exetract_router(resources, size, last_bracket);
+			for(int j = i; j < size; j++){
+				if(resources[j] == '}'){
+					close_brace_pos = j;
+					break;
+				}
+			}
+			resource_t *new_node = extract_router(resources, size, open_brace_pos, close_brace_pos);
 			if(new_node){
 				new_node->next = head.next;
 				head.next = new_node;

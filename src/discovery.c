@@ -73,7 +73,7 @@ int update_list(vm_configs_list_t *list, connection_t *conn, env_configs_t *conf
 	request_t req = {
 		.conn = *conn,
 		.method = GET_METHOD,
-		.path = "/cluster/resources?type=vm",
+		.path = "/api2/json/cluster/resources?type=vm",
 	};
 	printf("Polling proxmox for current vms\n");
 	response_t *res = make_request(&req, configs->conn_configs.pve_url);
@@ -121,7 +121,7 @@ int update_list(vm_configs_list_t *list, connection_t *conn, env_configs_t *conf
 	while(current){
 		req.conn = *conn;
 		req.method = GET_METHOD;
-		if(snprintf(req.path, sizeof(req.path), "/nodes/%s/qemu/%d/config", current->node, current->vmid) > sizeof(req.path)){
+		if(snprintf(req.path, sizeof(req.path), "/api2/json/nodes/%s/qemu/%d/config", current->node, current->vmid) > sizeof(req.path)){
 			current = current->next;
 			continue;
 		}

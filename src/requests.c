@@ -5,7 +5,7 @@
 
 #include "requests.h"
 
-#define AUTH_HEADER "Authorization: PVEAPIToken=%s!TOKENID=%s"
+#define AUTH_HEADER "Authorization: PVEAPIToken=%s=%s"
 #define FULL_URL_MAX 512
 
 size_t response_callback(char *data, size_t size, size_t nmemb, void *userdata){
@@ -86,6 +86,9 @@ connection_t *pve_conn_init(conn_configs_t *configs){
 		connection_cleanup(conn);
 		return NULL;
 	}
+
+	// curl_easy_setopt(conn->conn, CURLOPT_SSL_VERIFYPEER, 0L);
+	// curl_easy_setopt(conn->conn, CURLOPT_SSL_VERIFYHOST, 0L);
 
 	return conn;
 }
