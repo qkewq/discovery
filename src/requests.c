@@ -91,6 +91,7 @@ connection_t *pve_conn_init(conn_configs_t *configs){
 }
 
 response_t *make_request(request_t *req, char *base_url){
+	printf("Making request to endpoint: %s\n", req->path);
 	response_t *res = calloc(1, sizeof(response_t));
 	if(!res){
 		return NULL;
@@ -127,6 +128,7 @@ response_t *make_request(request_t *req, char *base_url){
 		free(res);
 		return NULL;
 	}
+	printf("Request completed with code: %d\n", res->code);
 
 	return res;
 }

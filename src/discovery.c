@@ -31,17 +31,23 @@ typedef struct env_configs_t{
 } env_configs_t;
 
 bool health_check(thread_t *thread){
+	printf("Performing server health check\n");
 	if(server_alive(thread)){
+		printf("Server reports: alive\n");
 		return true;
 	}
 
+	printf("Attemping server restart\n");
 	for(int i = 0; i < HEALTH_CHECK_RETRYS; i++){
+		printf("Retry (%d/%d)\n", i + 1, HEALTH_CHECK_RETRYS);
 		if(restart_server(thread)){
+			printf("Successful restart\n");
 			return true;
 		}
 		sleep(1);
 	}
 
+	printf("Health check failed\n");
 	return false;
 }
 
@@ -69,6 +75,7 @@ int update_list(vm_configs_list_t *list, connection_t *conn, env_configs_t *conf
 		.method = GET_METHOD,
 		.path = "/cluster/resources?type=vm",
 	};
+	printf("Polling proxmox for current vms\n");
 	response_t *res = make_request(&req, configs->conn_configs.pve_url);
 	if(!res){
 		return -1;
@@ -405,7 +412,7 @@ int main(int argc, char **argv){
 	env_free(env);
 
 	if(missing_configs){
-		printf("Missing %d requried key(s) in config\n", missing_configs);
+		printf("Missing %d requried key(s) in config, exitting\n", missing_configs);
 		free_configs(configs);
 		return 1;
 	}

@@ -74,6 +74,7 @@ int create_listener(struct sockaddr_in *s_in){
 		return -1;
 	}
 
+	printf("Server bound and listening\n");
 	return sfd;
 }
 
@@ -106,6 +107,7 @@ int idle_checks(int efd, client_t **head){
 	client_t *prev = NULL;
 	time_t time_limit = time(NULL) - IDLE_TIMEOUT_SEC;
 
+	printf("Checking for idle connections\n");
 	int count = 0;
 	while(current){
 		if(current->last_activity < time_limit || current->state == CTSTATE_WAITING_CLEANUP){
@@ -126,10 +128,12 @@ int idle_checks(int efd, client_t **head){
 		current = current->next;
 	}
 
+	printf("Closed %d idle connection(s)\n", count);
 	return count;
 }
 
 client_t *accept_new_client(int efd, int listener){
+	printf("New connection attempt\n");
 	client_t *client = calloc(1, sizeof(client_t));
 	if(!client){
 		return NULL;
@@ -152,6 +156,10 @@ client_t *accept_new_client(int efd, int listener){
 		free(client);
 		return NULL;
 	}
+
+	char new_addr[16] = {0};
+	inet_ntop(AF_INET, &client->sin.sin_addr, &new_addr[0], sizeof(new_addr));
+	printf("Accepted new connection from: %s:%d", new_addr, client->sin.sin_port);
 
 	return client;
 }
@@ -188,6 +196,8 @@ int wait_request(int efd, client_t *client, vm_configs_list_t *list){
 		return 0;
 	}
 
+	printf("Received complete request from client, processing\n");
+
 	mac_addr_t mac = {0};
 	memcpy(&mac, &client->recv_buffer[1], sizeof(mac_addr_t));
 	// mac_addr_t mac = (mac_addr_t)client->recv_buffer[1];
@@ -220,8 +230,14 @@ int wait_request(int efd, client_t *client, vm_configs_list_t *list){
 int send_response(client_t *client){
 	int num_send = send(client->generic.fd, &client->send_buffer[client->send_offset], client->send_used - client->send_offset, 0);
 
-	if(num_send <= 0 || num_send == client->send_used - client->send_offset){
+	if(num_send <= 0){
 		client->state = CTSTATE_WAITING_CLEANUP;
+		return 0;
+	}
+
+	if(num_send == client->send_used - client->send_offset){
+		client->state = CTSTATE_WAITING_CLEANUP;
+		printf("Completed sending response to client\n");
 		return 0;
 	}
 
@@ -303,6 +319,7 @@ void *server_th(void *server_arg){
 		}
 
 		if(*arg->status == TH_PARENT_JOIN){
+			printf("Server thread received stop signal from parent, exitting\n");
 			thread_cleanup(listener.fd, efd, clients, idle_timer.fd);
 			return NULL;
 		}
@@ -343,7 +360,7 @@ void *server_th(void *server_arg){
 }
 
 thread_t *create_server(char *listen_addr, uint16_t listen_port, vm_configs_list_t *list){
-	printf("Starting server thread with bind address %s:%d", listen_addr, listen_port);
+	printf("Starting server thread with bind address %s:%d\n", listen_addr, listen_port);
 
 	thread_t *thread = calloc(1, sizeof(thread_t));
 	if(!thread){
