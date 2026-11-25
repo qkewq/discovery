@@ -159,7 +159,7 @@ client_t *accept_new_client(int efd, int listener){
 
 	char new_addr[16] = {0};
 	inet_ntop(AF_INET, &client->sin.sin_addr, &new_addr[0], sizeof(new_addr));
-	printf("Accepted new connection from: %s:%d", new_addr, client->sin.sin_port);
+	printf("Accepted new connection from: %s:%d\n", new_addr, client->sin.sin_port);
 
 	return client;
 }
