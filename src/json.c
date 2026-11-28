@@ -1,124 +1,105 @@
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
 
 #include "json.h"
 #include "data.h"
 
-resource_t *extract_router(char *resources, size_t size, size_t open_brace, size_t close_brace){
+resource_t *extract_router(char *resource){
 	resource_t *new = calloc(1, sizeof(resource_t));
 	if(!new){
 		return NULL;
 	}
 
-	size_t current = open_brace;
-	int to_next_comma = 0;
-	while(current < close_brace){
-		if(to_next_comma && resources[current] != ','){
-			current++;
-			continue;
-		}
-		else if(to_next_comma && resources[current] == ','){
-			current++;
-			to_next_comma = 0;
-			continue;
-		}
+	char *value = NULL;
+	int length = 0;
 
-		if(!new->node){
-			if(memcmp(&resources[current], "\"node\":\"", 8) == 0){
-				current += 8;
-				int length = strcspn(&resources[current], "\"");
-				new->node = calloc(length + 1, 1);
-				if(!new->node){
-					free(new->pool);
-					free(new);
-					return NULL;
-				}
-				memcpy(new->node, &resources[current], length);
-				current += length + 1;
-				continue;
-			}
-		}
-		if(!new->pool){
-			if(memcmp(&resources[current], "\"pool\":\"", 8) == 0){
-				current += 8;
-				int length = strcspn(&resources[current], "\"");
-				new->pool = calloc(length + 1, 1);
-				if(!new->pool){
-					free(new->node);
-					free(new);
-					return NULL;
-				}
-				memcpy(new->pool, &resources[current], length);
-				current += length + 1;
-				continue;
-			}
-		}
-		if(!new->vmid){
-			if(memcmp(&resources[current], "\"vmid\":", 7) == 0){
-				current += 7;
-				new->vmid = atoi(&resources[current]);
-				to_next_comma++;
-				continue;
-			}
-		}
-		current++;
-		to_next_comma++;
-	}
-
-	if(!new->node || !new->pool || !new->vmid){
-		free(new->node);
-		free(new->pool);
+	value = strstr(resource, "\"vmid\":");
+	if(!value){
 		free(new);
 		return NULL;
 	}
+	value += 7;
+	new->vmid = atoi(value);
+	value = NULL;
+
+	value = strstr(resource, "\"node\":\"");
+	if(!value){
+		free(new);
+		return NULL;
+	}
+	value += 8;
+	length = strcspn(value, "\"");
+	new->node = calloc(length + 1, 1);
+	if(!new->node){
+		free(new);
+		return NULL;
+	}
+	memcpy(new->node, value, length);
+	value = NULL;
+
+	value = strstr(resource, "\"pool\":\"");
+	if(!value){
+		free(new->node);
+		free(new);
+		return NULL;
+	}
+	value += 8;
+	length = strcspn(value, "\"");
+	new->pool = calloc(length + 1, 1);
+	if(!new->pool){
+		free(new->node);
+		free(new);
+		return NULL;
+	}
+	memcpy(new->pool, value, length);
 
 	return new;
 }
 
-// keep pos of last open brace
-// check if name = router
-// run to last brace
-// give start and stop to extract router
-// extract router looks for node, pool, vmid
+bool is_router(char *resource){
+	if(strstr(resource, "\"name\":\"router\"")){
+		return true;
+	}
+
+	return false;
+}
 
 resource_t *extract_current_routers(char *resources, size_t size){
-	size_t open_brace_pos = 0;
-	size_t close_brace_pos = 0;
+	char *open_brace_pos = NULL;
+	char *close_brace_pos = NULL;
 	resource_t head = {0};
-
 	int i = 0;
+
 	for(i; i < size; i++){
 		if(resources[i] == '['){
-			i++;
 			break;
 		}
 	}
 
-	for(i; i < size; i++){
-		if(resources[i] == '{'){
-			open_brace_pos = i;
+	while(1){
+		open_brace_pos = (char *)memchr(&resources[i], '{', size - i);
+		if(!open_brace_pos){
+			return head.next;
+		}
+		i = open_brace_pos - resources;
+		close_brace_pos = (char *)memchr(&resources[i], '}', size - i);
+		if(!close_brace_pos){
+			return head.next;
+		}
+		i = close_brace_pos - resources;
+
+		*close_brace_pos = '\0';
+		if(!is_router(open_brace_pos)){
 			continue;
 		}
-		if(memcmp(&resources[i], "\"name\":\"router\"", 15) != 0){
-			for(i; i < size; i++){
-				if(resources[i] == ',' || resources[i] == '}'){
-					break;
-				}
-			}
+
+		resource_t *new_node = extract_router(open_brace_pos + 1);
+		if(new_node){
+			new_node->next = head.next;
+			head.next = new_node;
 		}
-		else{
-			for(int j = i; j < size; j++){
-				if(resources[j] == '}'){
-					close_brace_pos = j;
-					break;
-				}
-			}
-			resource_t *new_node = extract_router(resources, size, open_brace_pos, close_brace_pos);
-			if(new_node){
-				new_node->next = head.next;
-				head.next = new_node;
-			}
-		}
+
 	}
 
 	return head.next;
