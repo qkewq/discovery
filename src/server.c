@@ -111,6 +111,7 @@ int idle_checks(int efd, client_t **head){
 	int count = 0;
 	while(current){
 		if(current->last_activity < time_limit || current->state == CTSTATE_WAITING_CLEANUP){
+			count++;
 			if(current == *head){
 				*head = current->next;
 				destroy_client(efd, current);
@@ -122,7 +123,7 @@ int idle_checks(int efd, client_t **head){
 				destroy_client(efd, current);
 				current = prev->next;
 				continue;
-			}count++;
+			}
 		}
 		prev = current;
 		current = current->next;
@@ -324,6 +325,7 @@ void *server_th(void *server_arg){
 			return NULL;
 		}
 
+		int perform_idle_check = -1;
 		for(int i = 0; i < ready_fds; i++){
 			epoll_generic_t *generic = (epoll_generic_t *)events[i].data.ptr;
 			switch(generic->type){
@@ -348,12 +350,15 @@ void *server_th(void *server_arg){
 					handle_client(efd, client, events[i].events, arg->list);
 					break;
 				case PT_IDLE_CLIENT_CHECK:
-					idle_checks(efd, &clients);
-					reset_timer(generic->fd);
+					perform_idle_check = i; // make sure happens last to fix UAF
 					break;
 				default:
 					continue;
 			}
+		}
+		if(perform_idle_check != -1){
+			idle_checks(efd, &clients);
+			reset_timer(((epoll_generic_t *)events[i].data.ptr)->fd);
 		}
 	}
 
