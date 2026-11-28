@@ -358,7 +358,7 @@ void *server_th(void *server_arg){
 		}
 		if(perform_idle_check != -1){
 			idle_checks(efd, &clients);
-			reset_timer(((epoll_generic_t *)events[i].data.ptr)->fd);
+			reset_timer(((epoll_generic_t *)events[perform_idle_check].data.ptr)->fd);
 		}
 	}
 
