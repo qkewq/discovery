@@ -78,6 +78,7 @@ void delete_config(vm_configs_list_t *list, int vmid){
 		return;
 	}
 
+	free(config->config_json);
 	uint64_t mac = 0;
 	memcpy(&mac, &config->mac, sizeof(mac_addr_t));
 	pthread_mutex_lock(&list->lock);
@@ -87,7 +88,6 @@ void delete_config(vm_configs_list_t *list, int vmid){
 	pthread_mutex_unlock(&list->lock);
 
 	free(config->config_json);
-	free(config);
 }
 
 void free_vm_configs_list(vm_configs_list_t *list){

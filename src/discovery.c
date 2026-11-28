@@ -180,6 +180,8 @@ int update_list(vm_configs_list_t *list, connection_t *conn, env_configs_t *conf
 			current = current->next;
 			continue;
 		}
+		free(new_config);
+		free_response(res);
 
 		current = current->next;
 	}
