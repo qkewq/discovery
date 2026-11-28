@@ -173,9 +173,9 @@ mac_addr_t extract_mac_addr(char *data, size_t data_size){
 
 	int j = 0;
 	for(int i = 0; i < 6; i++){
-		int num = htoi(data[mac_start + i]) << 4;
+		int num = htoi(data[mac_start + i + j]) << 4;
 		j++;
-		num = htoi(data[mac_start + i + j]);
+		num += htoi(data[mac_start + i + j]);
 		j++;
 		mac.mac[i] = num;
 	}

@@ -199,7 +199,7 @@ int wait_request(int efd, client_t *client, vm_configs_list_t *list){
 	printf("Received complete request from client, processing\n");
 
 	mac_addr_t mac = {0};
-	memcpy(&mac, &client->recv_buffer[1], sizeof(mac_addr_t));
+	memcpy(&mac, &client->recv_buffer[1], 6);
 	// mac_addr_t mac = (mac_addr_t)client->recv_buffer[1];
 	vm_config_t *config = get_config_by_mac(list, mac);
 
