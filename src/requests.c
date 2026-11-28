@@ -87,8 +87,17 @@ connection_t *pve_conn_init(conn_configs_t *configs){
 		return NULL;
 	}
 
-	// curl_easy_setopt(conn->conn, CURLOPT_SSL_VERIFYPEER, 0L);
-	// curl_easy_setopt(conn->conn, CURLOPT_SSL_VERIFYHOST, 0L);
+	if(configs->skip_ssl){
+		if(curl_easy_setopt(conn->conn, CURLOPT_SSL_VERIFYPEER, 0L) != CURLE_OK){
+			connection_cleanup(conn);
+			return NULL;
+		}
+
+		if(curl_easy_setopt(conn->conn, CURLOPT_SSL_VERIFYHOST, 0L) != CURLE_OK){
+			connection_cleanup(conn);
+			return NULL;
+		}
+	}
 
 	return conn;
 }

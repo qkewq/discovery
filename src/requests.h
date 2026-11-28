@@ -21,6 +21,7 @@ typedef struct conn_configs_t{
 	char *api_key;
 	char *token_id;
 	char *pve_url;
+	int skip_ssl;
 } conn_configs_t;
 
 typedef struct request_t{

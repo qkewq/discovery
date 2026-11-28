@@ -375,6 +375,7 @@ int main(int argc, char **argv){
 	memcpy(configs->listen_addr, DEFAULT_LISTEN_ADDR, strlen(DEFAULT_LISTEN_ADDR));
 	configs->listen_port = DEFAULT_LISTEN_PORT;
 	configs->poll_timer_sec = DEFAULT_POLL_TIME_SEC;
+	configs->conn_configs.skip_ssl = 0;
 
 	char *value = NULL;
 	value = get_env(env, "LISTEN_ADDR");
@@ -391,6 +392,13 @@ int main(int argc, char **argv){
 	value = get_env(env, "POLL_TIME_SECONDS");
 	if(value){
 		configs->poll_timer_sec = atoi(value);
+		value = NULL;
+	}
+	value = get_env(env, "PROXMOX_SKIP_SSL_VERIFY");
+	if(value){
+		if(strcmp(value, "true") == 0){
+			configs->conn_configs.skip_ssl = 1;
+		}
 		value = NULL;
 	}
 
